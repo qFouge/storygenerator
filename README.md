@@ -1,95 +1,169 @@
 # storygenerator
 
-Générateur d'histoires audio pour road trips familiaux. Chaque épisode met en
-scène une famille fictive en voiture qui découvre un lieu historique ; l'un des
-personnages devient conteur et raconte un fait réel, dramatisé. Le script est
-ensuite découpé par personnage et lu par une voix distincte via ElevenLabs.
+Generates ~5-minute multi-character audio stories that entertain and usually
+teach something. A script generator writes the story as structured JSON already
+split into synthesizable chunks; ElevenLabs Text-to-Dialogue turns each chunk
+into audio with one distinct voice per character.
 
-**État actuel : pipeline texte uniquement.** L'étape audio n'est pas encore
-implémentée (voir « Ce qui n'existe pas encore »).
+Code and documentation are in English. **Stories and audio are generated in
+French.**
 
-## Démarrage
+**Current state: the synthesis slice only.** One hand-written chunk goes to
+ElevenLabs and comes back as an mp3. Script generation and stitching are not
+implemented yet — see "What doesn't exist yet".
+
+## Quick start
 
 ```bash
-cp .env.example .env        # renseigner ANTHROPIC_API_KEY
+cp .env.example .env          # fill in ELEVENLABS_API_KEY
+set -a; . ./.env; set +a      # no dotenv dependency; the shell loads it
+
 go test ./...
-go run ./cmd/generate -lieu chambord -dry-run   # résout les entrées, n'appelle pas l'API
-go run ./cmd/generate -lieu chambord            # génère out/chambord-<fait>.json
+go run ./cmd/dialogue -list-voices                       # stock voices your plan can use (free, no credits)
+go run ./cmd/dialogue -list-voices -voice-language fr    # ...only ones labelled French, if any
+go run ./cmd/dialogue                    # dry-run: prints the exact request body
+go run ./cmd/dialogue -send              # calls ElevenLabs, writes audio/chunk_0.mp3
+go run ./cmd/dialogue -send -stability 1 # same chunk, robust delivery
 ```
 
-`-fait <id>` force un fait précis, `-graine <n>` rend le tirage reproductible.
+`-story` points at a different script file, `-chunk` picks a chunk by
+`chunk_index`, `-out` changes the output directory.
 
-Un lieu ne produit rien tant qu'aucun de ses faits n'est marqué
-`verifie: true` : les données de départ de `data/lieux/chambord.yaml` sont
-rédigées de mémoire et doivent être recoupées avant usage.
+**On a free plan, use only the stock voices.** Voice Library voices return
+`402 paid_plan_required` through the API regardless of your credit balance — the
+constraint is the plan, not the credits. `-list-voices` shows the voices your
+key is actually allowed to synthesize with, with their `language` and `accent`
+labels; put three of their `voice_id`s into the `characters` of
+`testdata/chunk-fr.json`.
 
-## Architecture du pipeline
+**A voice speaking French is not the same as a voice sounding French.** Eleven
+v3 takes the language from the text, so any voice reads French as French — but
+a voice not trained on French carries its own accent. Check the `LANGUAGE` and
+`ACCENT` columns. No stock voice is currently French, so every line in
+`testdata/chunk-fr.json` opens with a `[French accent]` tag. Tags are billed as
+part of the text — those add about 8% per take.
+
+**Dry-run is the default on purpose.** The free tier is 10,000 credits a month
+at roughly one credit per character, and the test chunk is 1214 characters — so
+about eight takes a month. `-send` is the only thing that spends them.
+
+## Pipeline
 
 ```
-data/famille.yaml ─┐
-data/lieux/*.yaml ─┴─► [1] chargement + sélection du fait   pipeline/config.go, cmd/generate
-                              │
-prompts/*.md ────────► [2] rendu des prompts (text/template) pipeline/generer.go
-                              │
-                       [3] UN appel Claude, sortie JSON      pipeline/generer.go
-                           contrainte par schéma             pipeline/script.go
-                              │  { titre, conteur, intro[], histoire[] }
-                              │
-                       [4] validation de cohérence           pipeline/valider.go
-                              │
-                       [5] relecture sécurité enfants        pipeline/securite.go
-                              │  (second appel, modèle distinct)
-                              ▼
-                       out/<lieu>-<fait>.json
-                              │
-                       [6] TTS par réplique  ── pas encore implémenté
-                       [7] assemblage audio  ── pas encore implémenté
+testdata/chunk-fr.json ──► [1] load the story          story/story.go
+                                 │  Story{Characters, Chunks}
+                                 │
+                           [2] build the request       dialogue/dialogue.go
+                                 │  speaker → voice_id
+                                 │  reject unknown speakers
+                                 │  reject chunks over 2000 characters
+                                 │
+                           [3] POST /v1/text-to-dialogue
+                                 │  model_id: eleven_v3
+                                 │  language_code: fr
+                                 ▼
+                           audio/chunk_0.mp3
+
+                           [0] script generation (Gemini)  ── not implemented
+                           [4] stitching (ffmpeg)          ── not implemented
 ```
 
-### Les trois décisions structurantes
+## The structuring decisions
 
-**Un seul appel pour l'intro et l'histoire.** Le modèle voit tout l'arc d'un
-coup : pas de rupture de ton entre les deux parties, et le conteur est désigné
-une fois pour toutes.
+**One `voice_id` per character, fixed in the story file.** The cast is declared
+once in `characters` and every line references a character by `id`.
+`dialogue.Payload` refuses any line whose speaker is not in the cast, so a
+character cannot drift to another voice between chunks — there is nowhere for a
+second voice to come from.
 
-**Sortie JSON contrainte par schéma, pas des tags `[PERSONNAGE]` en texte
-brut.** Le champ `personnage` est un `enum` construit à l'exécution sur les IDs
-de `data/famille.yaml`. Un personnage historique ne *peut pas* devenir
-locuteur — la contrainte est appliquée par l'API, pas espérée dans le prompt.
-François Ier parle uniquement en discours rapporté, à l'intérieur d'une
-réplique du conteur.
+**Stability is one request-level float, not a per-character mode.** The brief
+asked for `robust` narration alongside `natural` dialogue, but the API
+documents `settings.stability` as a single double for the whole request. Since
+a chunk exists precisely so several characters can speak in one call,
+per-character stability is not expressible. Delivery is steered per line by
+audio tags instead.
 
-**Le casting est une donnée, pas de la prose.** Le même fichier alimente le
-prompt système *et* l'enum du schéma *et* la validation *et*, plus tard, la
-table des voix ElevenLabs. Une seule source de vérité pour la cohérence.
+**The script generator does the chunking, not a text splitter.** Splitting
+generated text on a character count lands mid-exchange. The model that
+understands narrative beats picks the boundaries; the synthesizer only enforces
+the ceiling as a backstop.
 
-Le raisonnement complet, y compris ce qui a été écarté, est dans
-[docs/coherence-multi-personnages.md](docs/coherence-multi-personnages.md).
+**Characters are counted as runes, not bytes.** French accents are two bytes in
+UTF-8, so `len` would report a valid 1500-character chunk as 2900 and refuse
+it.
 
-## Organisation des fichiers
+The full reasoning, including what was rejected, is in
+[docs/text-to-dialogue.md](docs/text-to-dialogue.md).
 
-| Chemin | Rôle |
+## Files
+
+| Path | Role |
 |---|---|
-| `data/famille.yaml` | Le casting récurrent : caractère, façon de parler, voix ElevenLabs |
-| `data/lieux/<id>.yaml` | Un lieu et ses faits historiques sourcés |
-| `prompts/systeme.md` | Casting + règles de cohérence. Stable ⇒ mis en cache par l'API |
-| `prompts/utilisateur.md` | Le lieu et le fait du jour. C'est ce qui varie |
-| `pipeline/` | Chargement, schéma, génération, validation, sécurité |
-| `cmd/generate/` | CLI |
-| `out/` | Scripts générés (ignoré par git) |
-| `audio/` | Sortie audio à venir (ignoré par git) |
-| `docs/` | Décisions de conception et archives |
+| `story/story.go` | The schema both ends agree on: `Story`, `Character`, `Chunk`, `Line` |
+| `dialogue/dialogue.go` | Chunk → Text-to-Dialogue request body, and the POST |
+| `dialogue/voices.go` | Lists the stock voices the plan allows |
+| `cmd/dialogue/` | CLI for one chunk |
+| `testdata/chunk-fr.json` | Hand-written French three-character test chunk |
+| `docs/` | Design decisions and archived briefs |
+| `audio/` | Generated audio (git-ignored) |
+| `out/` | Generated scripts (git-ignored) |
 
-## Ce qui n'existe pas encore
+`go.mod` has no external dependencies. Everything here is the standard library.
 
-- **Étapes 6 et 7** : appel ElevenLabs par réplique et assemblage. Le format de
-  sortie est déjà l'unité d'envoi — une réplique = une requête TTS = une voix.
-- Base de données de lieux : un fichier YAML par lieu suffit pour l'instant.
-- Interface : aucune. Si une interface arrive un jour, elle sera mobile-first.
-- Boucle de régénération automatique quand `Valider` remonte des anomalies :
-  aujourd'hui elles sont affichées sur stderr, le script est écrit quand même.
+## What doesn't exist yet
 
-## Sécurité
+- **Script generation.** `scriptgen` will call Gemini
+  (`google.golang.org/genai`) with the story schema as `ResponseSchema`, so the
+  model is structurally forced into valid JSON instead of being asked nicely.
+  It comes after the listening test, because the prompt has to encode a
+  stability decision that has not been made yet.
+- **Stitching.** Concatenating `chunk_*.mp3` with a short silence between them,
+  by shelling out to `ffmpeg` — Go has no `pydub` equivalent.
+- **A voice bank.** With one story, the cast inside the story file *is* the
+  voice bank. A shared `voicebank.json` earns its place when a second story
+  reuses the same characters.
+- **A good-take cache.** Eleven v3 is alpha and a chunk may need several
+  generations. Caching the take you liked, per chunk, avoids re-synthesizing
+  four good minutes to fix one bad one.
 
-`.env` est ignoré par git ; `.env.example` ne contient que des placeholders.
-Aucune clé ne doit apparaître dans un fichier suivi, un prompt ou un YAML.
+The previous direction of this project — road-trip stories about Loire châteaux,
+generated in French with the Anthropic API — is archived in
+[docs/brief-initial.md](docs/brief-initial.md) and
+[docs/coherence-multi-personnages.md](docs/coherence-multi-personnages.md), and
+its code is in the first commit.
+
+## Security
+
+`.env` is git-ignored; `.env.example` holds placeholders only. No key belongs in
+a tracked file, a prompt, or a story JSON. Keys are read from the environment at
+call time and never written anywhere.
+
+### What access the ElevenLabs key needs
+
+ElevenLabs keys are **restricted by default** — you enable features explicitly
+when creating one. This pipeline calls exactly one endpoint,
+`POST /v1/text-to-dialogue`, so grant only the scope that covers speech
+synthesis and leave everything else off: Speech to Text, Dubbing, Agents,
+Studio, voice cloning and workspace administration are all unused.
+
+Read access to voices is also needed, because `-list-voices` calls
+`GET /v2/voices` to find which voices the plan permits. That call spends no
+credits. Nothing here ever writes a voice, so write access is not required.
+
+The dashboard's exact scope labels are not documented, so pick the narrowest
+set that covers Text to Dialogue and verify with a dry-run followed by one
+`-send`. A key that is too narrow fails loudly with a 401; a key that is too
+broad fails silently, which is the worse of the two.
+
+Two settings worth using beyond scopes:
+
+- **Credit quota.** A per-key monthly character limit, after which charged
+  requests fail. Set it below your plan's allowance — a few thousand
+  characters is plenty here, and it means a retry loop cannot drain the month.
+- **Expiry.** User keys can be given a lifetime (15 minutes to 30 days). A
+  development key that expires on its own is one you cannot forget to rotate.
+
+IP allowlisting is also available but impractical from a laptop with a changing
+address; it becomes worth setting if this ever runs from a fixed CI host.
+
+Note that the free tier is licensed for personal, non-commercial use.

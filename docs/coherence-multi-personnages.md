@@ -1,3 +1,11 @@
+> **Superseded (September 2026).** This documents the road-trip / Loire-châteaux
+> direction, generated with the Anthropic API in French. The project was
+> re-briefed around generic multi-character audio stories, Gemini for script
+> generation and ElevenLabs Text-to-Dialogue for audio. Kept as a record of a
+> direction that was abandoned, and of the reasoning behind it. Current brief:
+> [brief-dialogue.md](brief-dialogue.md). Current decisions:
+> [text-to-dialogue.md](text-to-dialogue.md).
+
 # Cohérence de la génération multi-personnages
 
 Note de conception, session d'initialisation du repo. Répond aux cinq questions
