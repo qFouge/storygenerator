@@ -1,11 +1,34 @@
 # Multi-voice synthesis: decisions
 
-Design note for the Text-to-Dialogue slice. Answers the open points of
-[brief-dialogue.md](brief-dialogue.md), including the three places where the
-brief and the documented API disagree. Verified against the ElevenLabs API
-reference and the Text-to-Dialogue capability page in September 2026.
+Design note for the Text-to-Dialogue slice. It answers the open points of
+[brief-dialogue.md](brief-dialogue.md), records every place the brief and the
+documented API disagree — the full list is the divergence table at the foot of
+the brief — and keeps the results of listening to what came back, which is the
+only way several of these questions could be settled at all.
+
+Claims about the API were verified against the ElevenLabs API reference, the
+Text-to-Dialogue capability page, the v3 prompting guide and the audio-tags
+guide in September 2026. Claims about how things *sound* come from actually
+listening to generated chunks, and are marked as such.
 
 ---
+
+## 0. English code and documentation, French stories
+
+Decided at the re-briefing: Go identifiers, JSON field names, comments, the
+README and these notes are written in English; the stories and the synthesized
+audio are in French. The previous direction had been French throughout, down to
+identifiers like `Valider` and `Demande`.
+
+The split has three consequences that show up repeatedly below, and it is worth
+naming them together because they are easy to mistake for unrelated problems:
+
+- the character ceiling must be counted in runes, since French is accented (§4);
+- `language_code` is set to `"fr"`, which is a field the brief's schema did not
+  have (§1);
+- the voice casting problem is entirely created by it — the stock voices are
+  not French (§8) — as is the need to write non-verbal sounds in French
+  orthography (§10).
 
 ## 1. Character consistency splits into three, and only two of them are buyable
 
@@ -102,7 +125,7 @@ So `cmd/dialogue` prints the exact request body and stops. `-send` is what
 spends credits, and the character count is printed before the call either way.
 Getting the payload wrong should cost nothing.
 
-## 6b. On the free plan, only stock voices work through the API
+## 7. On the free plan, only stock voices work through the API
 
 The brief (§3) suggests picking voices from the Voice Library because it needs
 no cloning setup. That is true in the dashboard and false through the API on a
@@ -128,7 +151,7 @@ and the request is sent.
 
 The call costs no credits, which is why it is not behind `-send`.
 
-## 6c. A voice not trained on French will sound foreign reading French
+## 8. A voice not trained on French will sound foreign reading French
 
 Eleven v3 takes the *language* from the input text, so French text produces
 French speech with any voice. The *accent* is a different question, and
@@ -162,20 +185,24 @@ Three ways out if no stock voice is French, in increasing cost:
 **Decision: option 2.** `-list-voices -voice-language fr` returned nothing, so
 the free plan has no French-trained voice. Every line therefore opens with a
 `[French accent]` tag, ahead of its emotion tag, and the cast is drawn from the
-stock voices: Bill (Wise, Mature, Balanced, labelled `old`) narrates, Brian
-(Deep, Resonant and Comforting) plays Aristide, Laura (Enthusiast, Quirky
-Attitude, labelled `young`) plays Lucie.
+stock voices: Brian (Deep, Resonant and Comforting) narrates, George (Warm,
+Captivating Storyteller) plays Aristide, Laura (Enthusiast, Quirky Attitude,
+labelled `young`) plays Lucie.
 
 Casting against the voice labels rather than the names is what made this
-tractable: Aristide's note asks for "grave et rassurante", which is Brian's
-description almost word for word, and Lucie needed the `age` label more than
-any timbre adjective.
+tractable, and the labels reward being read literally: George is described as a
+storyteller and Aristide is precisely the character who tells the story inside
+the story, while Lucie needed the `age` label more than any timbre adjective.
 
-One risk this cast carries: two of the three voices are male, and the voice
-labelled `old` narrates while the old character is played by a `middle_aged`
-one. Whether the narrator and Aristide stay distinguishable — and whether the
-inverted ages are audible — is a question for the first listen, not something
-the labels can settle.
+The cast reached this shape by ear over several rounds. Bill, the only voice
+labelled `old`, narrated first and was the flattest of the lot despite being the
+best fit on paper for a wise narrator — which is the lesson of §9 in miniature:
+the label predicts fit, not expressiveness.
+
+One risk remains: two of the three voices are male and both are `middle_aged`,
+so whether the narrator and Aristide stay distinguishable is a question for the
+ear. "Deep, Resonant" against "Warm, Captivating" is a wider gap than the
+previous pairing had, but it is still two middle-aged men.
 
 The tag lives in the story data, not in code. Nothing wraps or injects it: the
 script generator will be told to emit it, exactly as it is told to emit emotion
@@ -202,9 +229,146 @@ are being replaced and expire on 31 December 2026. Hardcoding stock voice IDs
 into story files is fine for now, but those IDs have a known end date, which is
 a second argument for a voice bank once there is more than one story.
 
-## 7. What was deliberately not built
+## 9. Expressiveness lives in the text, not in the stability knob
 
-- **`voicebank.json`** (§6.1, §7). With one story, the cast inside the story
+First listening result: the accent tag works and the voices carry French, but
+the two male voices came out emotionally flat, the narrator worst. Turning
+`stability` down to `0` (Creative) did not open them up — it made the whole
+chunk sound *sad*, and `1` (Robust) was no better.
+
+That is the stability knob doing what it says. It controls how far the model may
+depart from the voice's recorded delivery; it does not tell it *which* emotion
+to depart towards. With a wistful text — a sea that has vanished, a child
+falling silent — the extra latitude at `0` went into melancholy, because that
+is what the words carried. The knob amplifies the text's emotion; it does not
+choose it.
+
+**Decision: emotional direction is written into the line, and stability stays at
+the default.** Three mechanisms, all documented for v3, all inside
+`inputs[].text`:
+
+1. **Several tags per line, placed mid-sentence**, each immediately before the
+   phrase it affects. A line is not one emotion; it is a small arc.
+2. **Capitalization for emphasis** on the one word that carries the beat —
+   "quelque chose d'IMPOSSIBLE", "Elle la TIRE". This is the per-word
+   granularity that tags cannot express.
+3. **Punctuation.** The documentation is explicit that it significantly affects
+   delivery in v3: ellipses add pause and weight, exclamation marks lift.
+
+The test chunk was rewritten on all three, and its emotional register moved
+from wistful to wondering — the narrator now opens on something IMPOSSIBLE and
+closes on delight rather than on a child going quiet.
+
+The tag vocabulary is also wider than the brief's §5 list, which matters when
+that list becomes `scriptgen`'s prompt. Beyond the emotions the brief names, the
+documentation and the audio-tags guide use `[sorrowful]`, `[calm]`,
+`[cheerfully]`, `[playfully]`, `[flatly]`, `[deadpan]`, `[nervous]`,
+`[frustrated]`, and cognitive beats such as `[pauses]`, `[hesitates]` and
+`[stammers]`. Tags are written lowercase in square brackets.
+
+**This contradicts the brief.** Its §5 instructs the script generator "don't overuse
+tags — one or two per line is usually enough". Against these stock voices that
+is too thin: lines now carry three to five tags. The brief's advice is sound for
+an expressive voice and wrong for a flat one, so the rule that goes into
+`scriptgen`'s prompt has to be conditional on the cast, not absolute.
+
+The cost is real and worth tracking: tags and emphasis are billed as ordinary
+text. The chunk went from 1214 characters bare, to 1310 with accent tags, to
+1504 now — 24% above where it started, on a 10,000-character monthly budget.
+Roughly six takes a month rather than eight.
+
+If tags start being *spoken* rather than acted on, thinning them is the first
+move, and the accent tag is the one to drop first since the emotion tags are
+doing the work this section is about.
+
+## 10. Non-verbal tags depend on the voice; write the sound into the words
+
+Second listening result: the emotion tags landed and the delivery improved, but
+`[chuckles]` produced nothing audible at all.
+
+This is documented behaviour rather than a bug. The audio-tags guide says a tag
+read as nothing — or read aloud — "typically occurs when the selected voice
+doesn't match the requested delivery, such as a naturally soft-spoken voice
+being asked to perform several [shouts]", and its remedy is to "choose a voice
+with a wide emotional range for tag-heavy scripts".
+
+That remedy is unavailable here. Every voice the free plan offers is described as
+controlled — Deep and Resonant, Warm and Captivating, Enthusiast and Quirky.
+None is a wide-range performer, and a purely non-verbal tag has nothing in the
+voice's recorded range to draw on. Emotional *colouring* tags work because they
+bend an existing delivery; a laugh has to be produced from scratch, and a voice
+that never laughed in training cannot.
+
+**Decision: non-verbal sounds are written into the text, with the tag kept
+alongside as reinforcement.** Aristide's line now reads "Héhé... héhé !
+[chuckles] Ah non, ma petite Lucie" rather than "[chuckles] Ah non". The
+written laugh is speech, so it cannot be skipped; the tag then shapes how it is
+performed instead of being solely responsible for its existence.
+
+This generalises the §9 finding: the text is the reliable channel and the tags
+are the modifier. It is also the rule `scriptgen`'s prompt needs for every
+non-verbal — `[sighs]`, `[gasps]`, `[laughs]` — not just this one, since they
+all ask the voice for a sound rather than for a manner.
+
+Written laughter is language-specific, which the prompt will have to say out
+loud: "Héhé" is a French chuckle, "heh heh" is not.
+
+Cost: 14 characters, 1504 to 1518.
+
+## 11. Which versions are current (checked September 2026)
+
+Three version numbers appear in this pipeline and they are independent of each
+other, which invites the suspicion that one of them is stale. It is worth
+writing down so the question does not have to be reopened:
+
+| Where | Value | Status |
+|---|---|---|
+| Voice listing | `GET /v2/voices` | Current. There is no `/v3/voices`; the legacy one is `/v1/voices`, which this code does not use. |
+| Synthesis | `POST /v1/text-to-dialogue` | Current. This endpoint has only ever been v1. |
+| Model | `eleven_v3` | Current. No v4 exists; it is still documented as the most advanced model. |
+
+So `v2` in the voices URL is the newest version of that endpoint, not a leftover,
+and the `v3` in the model id is a model generation rather than an API version.
+
+One neighbouring model is worth knowing about and rejecting explicitly:
+`eleven_v3_conversational`, a realtime variant at roughly 280ms latency that
+drives a **WebSocket** Text-to-Dialogue API. It buys latency, not quality, and
+this pipeline writes files that nobody listens to as they are produced. It would
+be the right model for a live agent and is the wrong one here.
+
+`eleven_turbo_v2_5` and `eleven_turbo_v2` are documented as outclassed by their
+Flash equivalents; neither is relevant, since only `eleven_v3` supports
+multi-speaker dialogue with audio tags.
+
+One more pair of numbers worth separating, because meeting the larger one first
+would suggest the code's limit is wrong: `eleven_v3` is documented with a
+5,000-character limit as a *model*, while Text to Dialogue caps a *request* at
+2,000 characters across all of `inputs[].text`. The lower one binds here, and
+`MaxChars` is set from it.
+
+## 12. What listening has established so far
+
+Three takes have been generated and listened to. Since several of these
+questions cannot be answered from documentation at all, the results are the
+evidence behind §8, §9 and §10 and are worth stating plainly:
+
+| Question | Answer |
+|---|---|
+| Do the stock voices carry French? | Yes. |
+| Is `[French accent]` acted on or read aloud? | Acted on. |
+| Do emotion tags land? | Yes, once several are placed mid-line with emphasis and punctuation. |
+| Does `[chuckles]` land? | No — nothing audible. Sound-producing tags need the sound written into the text. |
+| Does `stability` control expressiveness? | No. `0` made the chunk sound sad; `1` was no better. It amplifies the text's emotion rather than choosing one. |
+| Which cast? | Settled by ear over three rounds, not from labels — see §8. |
+
+The casting rounds are worth recording because the discarded ones carry the
+lesson: Adam (Dominant, Firm) and Bella were replaced for fit, Jessica for
+Laura, and Bill — the only voice labelled `old`, and the best match on paper for
+a wise narrator — was dropped for being the flattest of the lot.
+
+## 13. What was deliberately not built
+
+- **`voicebank.json`** (brief §6.1 and §7). With one story, the cast inside the story
   file *is* the voice bank. A separate file earns its place when a second story
   needs the same characters — that is also when the recurring-character series
   the brief wants becomes real.
@@ -213,28 +377,41 @@ a second argument for a voice bank once there is more than one story.
   can only be made by listening: which stability, and whether the chosen voices
   handle French well.
 - **The streaming endpoint.** Nothing listens live; a file is the deliverable.
+- **An explicit `output_format`.** The endpoint takes it as a query parameter
+  and defaults to `mp3_44100_128`, so the code relies on that default while
+  naming its output `chunk_N.mp3`. The two agree today and nothing verifies that
+  they still would: a changed default would produce correct audio under a
+  misleading extension. Setting it explicitly is one query parameter, and is the
+  right fix the moment anything but a person's ear consumes these files.
 - **`seed`.** Useful for A/B-ing a wording change on one chunk. There is nothing
   to compare yet, and the field is one pointer away when there is.
-- **A good-take cache** (§6.4). Correct idea, premature: it needs more than one
+- **A good-take cache** (brief §6.4). Correct idea, premature: it needs more than one
   chunk and more than one take to have anything to cache.
 
-## 8. Still open
 
-- **Which stability.** The whole point of the slice. Listen to `chunk_0.mp3` at
-  `0.5`, then at `1.0`, and decide before any longer script is generated.
-- **Whether `[French accent]` actually works.** It is a documented v3 tag, but
-  a tag inside French text is an untested combination: the failure mode is the
-  bracketed words being spoken instead of applied. First thing to listen for.
+## 14. Still open
+
+- **Which stability.** Answered, and the answer is that it is the wrong knob for
+  this problem: `0` sounded sad, `1` no better, so the default `0.5` stands and
+  expressiveness is written into the text instead (§9).
+- **Whether the written laugh lands where the bare tag did not.** "Héhé..."
+  cannot be skipped the way `[chuckles]` was, but whether it sounds like a laugh
+  or like two spoken syllables is the open question.
+- **Whether lower stability would have rescued the tags instead.** `Robust` is
+  documented as "less responsive to directional prompts", which implies
+  `Creative` is more responsive. `0` was rejected earlier for sounding sad, but
+  that was a different cast reading a wistful text; both have since changed, so
+  the earlier verdict does not carry over. One take would settle it.
 - **Whether a `young` voice passes for a child.** The stock set has no child
   voice; Laura is the closest. Judge by ear before deciding to rewrite Lucie
   older or to pay.
-- **Whether the narrator and Aristide stay distinct.** Both are male stock
-  voices. If they blend, swapping them is free — Bill is the one labelled
-  `old`, which is Aristide's description.
-- **Whether audio tags work in French text.** Tags are English tokens in square
-  brackets sitting inside French sentences. The docs do not say what happens
-  when the two languages mix, and the failure mode to listen for is a tag being
-  read aloud rather than acted on.
+- **Whether the narrator and Aristide stay distinct.** Both are male and both
+  `middle_aged`. The stock set offers no third male register, so if they blend
+  the fix is not another swap.
+- **How far the tag-heavy approach can be pushed.** Answered in part by
+  listening: English tags inside French text are acted on, not read aloud, and
+  three to five per line are tolerated. Colouring tags work; sound-producing
+  ones did not (§10). Where the ceiling actually sits is untested.
 - **The real credit rate.** The brief says the API is discounted relative to the
   website's one-credit-per-character, but the rate is unpublished. The first
   `-send` against a known 1214-character chunk measures it against the dashboard

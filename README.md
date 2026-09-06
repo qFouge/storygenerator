@@ -40,8 +40,14 @@ labels; put three of their `voice_id`s into the `characters` of
 v3 takes the language from the text, so any voice reads French as French — but
 a voice not trained on French carries its own accent. Check the `LANGUAGE` and
 `ACCENT` columns. No stock voice is currently French, so every line in
-`testdata/chunk-fr.json` opens with a `[French accent]` tag. Tags are billed as
-part of the text — those add about 8% per take.
+`testdata/chunk-fr.json` opens with a `[French accent]` tag.
+
+**Emotion is written into the line, not set by a flag.** The stock voices are
+flat at every stability value, so lines carry several tags placed mid-sentence,
+capitals on the word that carries the beat, and ellipses for weight. Tags and
+capitals are billed as ordinary text: the test chunk costs 1504 characters
+against 1214 untagged, so about six takes a month rather than eight. The
+reasoning is in [docs/text-to-dialogue.md](docs/text-to-dialogue.md).
 
 **Dry-run is the default on purpose.** The free tier is 10,000 credits a month
 at roughly one credit per character, and the test chunk is 1214 characters — so
@@ -91,6 +97,16 @@ the ceiling as a backstop.
 **Characters are counted as runes, not bytes.** French accents are two bytes in
 UTF-8, so `len` would report a valid 1500-character chunk as 2900 and refuse
 it.
+
+**Emotion is a property of the text, not of a setting.** `stability` amplifies
+whatever emotion the words already carry; it does not choose one. So delivery is
+directed by several tags per line placed mid-sentence, capitals on the beat
+word, and punctuation — established by listening, not from the docs.
+
+**Non-verbal sounds are written out as words.** `[chuckles]` produced nothing
+audible: a tag asking a voice for a sound it never made in training has nothing
+to draw on, unlike one colouring an existing delivery. So the laugh is spelled
+in the line — "Héhé... héhé !" — with the tag kept as reinforcement.
 
 The full reasoning, including what was rejected, is in
 [docs/text-to-dialogue.md](docs/text-to-dialogue.md).

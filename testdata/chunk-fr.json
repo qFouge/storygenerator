@@ -8,14 +8,14 @@
     {
       "id": "narrateur",
       "display_name": "Narrateur",
-      "voice_id": "pqHfZKP75CvOlQylNhV4",
-      "notes": "conteur posé et chaleureux, prend son temps, plante le décor sans surjouer. Voix Bill (Wise, Mature, Balanced, étiquetée « old ») : conteur d'expérience, posé."
+      "voice_id": "nPczCjzI2devNBz1zQrb",
+      "notes": "conteur posé et chaleureux, plante le décor sans surjouer. Voix Brian (Deep, Resonant and Comforting) : grave et posée, elle portait Aristide avant de passer à la narration."
     },
     {
       "id": "aristide",
       "display_name": "Aristide, le gardien du phare",
-      "voice_id": "nPczCjzI2devNBz1zQrb",
-      "notes": "vieil homme, voix grave et rassurante, explique lentement, jamais condescendant. Voix Brian (Deep, Resonant and Comforting) : grave et rassurante, ce que demande le personnage."
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "notes": "vieil homme, voix grave et rassurante, explique lentement, jamais condescendant. Voix George (Warm, Captivating Storyteller) : Aristide est le conteur à l'intérieur de l'histoire, l'étiquette tombe juste."
     },
     {
       "id": "lucie",
@@ -30,27 +30,27 @@
       "lines": [
         {
           "speaker": "narrateur",
-          "text": "[French accent] [warmly] Ce matin-là, à Saint-Malo, la mer avait disparu. Là où les bateaux flottaient la veille, il ne restait plus que du sable mouillé et des flaques qui brillaient au soleil."
+          "text": "[French accent] [warmly] Ce matin-là, à Saint-Malo, il s'est passé quelque chose d'IMPOSSIBLE. [dramatically] La mer avait disparu. [curious] Là où les bateaux flottaient la veille... plus rien ! Rien que du sable mouillé et des flaques qui brillaient au soleil."
         },
         {
           "speaker": "lucie",
-          "text": "[French accent] [curious] Monsieur Aristide ! Monsieur Aristide, venez voir ! La mer est partie pendant la nuit. Est-ce que quelqu'un a retiré le bouchon, comme dans une baignoire ?"
+          "text": "[French accent] [excited] Monsieur Aristide ! Monsieur Aristide, venez VITE ! [curious] La mer est partie pendant la nuit. [playfully] Est-ce que quelqu'un a retiré le bouchon... comme dans une baignoire ?"
         },
         {
           "speaker": "aristide",
-          "text": "[French accent] [chuckles] Non, ma petite Lucie... personne n'a retiré le bouchon. La mer est toujours là, elle s'est simplement penchée de l'autre côté. Regarde le ciel : tu vois la Lune, toute pâle, juste au-dessus du phare ?"
+          "text": "[French accent] Héhé... héhé ! [chuckles] Ah non, ma petite Lucie, personne n'a retiré le bouchon ! [warmly] La mer est toujours là. Elle s'est simplement penchée de l'autre côté. [curious] Regarde le ciel : tu vois la Lune, toute pâle, juste au-dessus du phare ?"
         },
         {
           "speaker": "lucie",
-          "text": "[French accent] [excited] Oui, je la vois ! Mais la Lune est tellement loin, tout là-haut. Comment est-ce qu'elle pourrait toucher la mer, d'aussi loin que ça ?"
+          "text": "[French accent] [excited] Oui, je la VOIS ! [curious] Mais elle est tellement loin, tout là-haut. Comment est-ce qu'elle pourrait toucher la mer, d'aussi loin que ça ?"
         },
         {
           "speaker": "aristide",
-          "text": "[French accent] [warmly] Elle ne la touche pas, Lucie. Elle la tire. La Lune attire l'eau des océans, doucement, sans jamais s'arrêter — et l'eau se soulève vers elle comme une immense bosse. Quand ta plage passe sous cette bosse, c'est la marée haute. Et quand elle en sort... la mer s'en va."
+          "text": "[French accent] [warmly] Elle ne la touche pas, Lucie. [dramatically] Elle la TIRE. La Lune attire l'eau des océans, doucement, sans jamais s'arrêter — et l'eau se soulève vers elle comme une immense bosse. [curious] Quand ta plage passe sous cette bosse, c'est la marée haute. [warmly] Et quand elle en sort... la mer s'en va."
         },
         {
           "speaker": "narrateur",
-          "text": "[French accent] [dramatically] Lucie resta un long moment silencieuse, à regarder la Lune pâlir au-dessus du phare. Puis elle comprit quelque chose d'énorme : ce sable sous ses pieds, deux fois par jour, obéissait à un caillou géant flottant dans le ciel."
+          "text": "[French accent] [curious] Lucie resta un long moment silencieuse, à regarder la Lune. [dramatically] Puis elle comprit quelque chose d'ÉNORME : ce sable sous ses pieds, deux fois par jour, obéissait à un caillou géant qui flotte dans le ciel. [cheerfully] Deux fois par jour ! Depuis toujours !"
         }
       ]
     }
