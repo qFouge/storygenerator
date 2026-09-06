@@ -1,0 +1,4 @@
+.env
+/out/
+/audio/*.mp3
+/audio/*.wav
