@@ -30,27 +30,27 @@
       "lines": [
         {
           "speaker": "narrateur",
-          "text": "[French accent] [warmly] Ce matin-là, à Saint-Malo, il s'est passé quelque chose d'IMPOSSIBLE. [dramatically] La mer avait disparu. [curious] Là où les bateaux flottaient la veille... plus rien ! Rien que du sable mouillé et des flaques qui brillaient au soleil."
+          "text": "[strong French accent] [warmly] Ce matin-là, à Saint-Malo, il s'est passé quelque chose d'IMPOSSIBLE. [dramatically] La mer avait disparu. [curious] Là où les bateaux flottaient la veille... plus rien ! Rien que du sable mouillé et des flaques qui brillaient au soleil."
         },
         {
           "speaker": "lucie",
-          "text": "[French accent] [excited] Monsieur Aristide ! Monsieur Aristide, venez VITE ! [curious] La mer est partie pendant la nuit. [playfully] Est-ce que quelqu'un a retiré le bouchon... comme dans une baignoire ?"
+          "text": "[strong French accent] [excited] Monsieur Aristide ! Monsieur Aristide, venez VITE ! [curious] La mer est partie pendant la nuit. [playfully] Est-ce que quelqu'un a retiré le bouchon... comme dans une baignoire ?"
         },
         {
           "speaker": "aristide",
-          "text": "[French accent] Héhé... héhé ! [chuckles] Ah non, ma petite Lucie, personne n'a retiré le bouchon ! [warmly] La mer est toujours là. Elle s'est simplement penchée de l'autre côté. [curious] Regarde le ciel : tu vois la Lune, toute pâle, juste au-dessus du phare ?"
+          "text": "[strong French accent] Héhé... héhé ! [chuckles] Ah non, ma petite Lucie, personne n'a retiré le bouchon ! [warmly] La mer est toujours là. Elle s'est simplement penchée de l'autre côté. [curious] Regarde le ciel : tu vois la Lune, toute pâle, juste au-dessus du phare ?"
         },
         {
           "speaker": "lucie",
-          "text": "[French accent] [excited] Oui, je la VOIS ! [curious] Mais elle est tellement loin, tout là-haut. Comment est-ce qu'elle pourrait toucher la mer, d'aussi loin que ça ?"
+          "text": "[strong French accent] [excited] Oui, je la VOIS ! [curious] Mais elle est tellement loin, tout là-haut. Comment est-ce qu'elle pourrait toucher la mer, d'aussi loin que ça ?"
         },
         {
           "speaker": "aristide",
-          "text": "[French accent] [warmly] Elle ne la touche pas, Lucie. [dramatically] Elle la TIRE. La Lune attire l'eau des océans, doucement, sans jamais s'arrêter — et l'eau se soulève vers elle comme une immense bosse. [curious] Quand ta plage passe sous cette bosse, c'est la marée haute. [warmly] Et quand elle en sort... la mer s'en va."
+          "text": "[strong French accent] [warmly] Elle ne la touche pas, Lucie. [dramatically] Elle la TIRE. La Lune attire l'eau des océans, doucement, sans jamais s'arrêter — et l'eau se soulève vers elle comme une immense bosse. [curious] Quand ta plage passe sous cette bosse, c'est la marée haute. [warmly] Et quand elle en sort... la mer s'en va."
         },
         {
           "speaker": "narrateur",
-          "text": "[French accent] [curious] Lucie resta un long moment silencieuse, à regarder la Lune. [dramatically] Puis elle comprit quelque chose d'ÉNORME : ce sable sous ses pieds, deux fois par jour, obéissait à un caillou géant qui flotte dans le ciel. [cheerfully] Deux fois par jour ! Depuis toujours !"
+          "text": "[strong French accent] [curious] Lucie resta un long moment silencieuse, à regarder la Lune. [dramatically] Puis elle comprit quelque chose d'ÉNORME : ce sable sous ses pieds, deux fois par jour, obéissait à un caillou géant qui flotte dans le ciel. [cheerfully] Deux fois par jour ! Depuis toujours !"
         }
       ]
     }

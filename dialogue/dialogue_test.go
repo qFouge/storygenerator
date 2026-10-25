@@ -1,8 +1,13 @@
 package dialogue
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/qdefou/storygenerator/story"
 )
@@ -133,5 +138,66 @@ func TestTestdataChunkIsSynthesizable(t *testing.T) {
 		if len(req.Inputs) != len(c.Lines) {
 			t.Errorf("chunk %d: %d inputs for %d lines", c.ChunkIndex, len(req.Inputs), len(c.Lines))
 		}
+	}
+}
+
+// fakeAPI answers with the given statuses in order, then 200 "audio", and
+// counts the requests it received. The counter is atomic because the handler
+// runs on the server's goroutine while the test reads it on its own.
+func fakeAPI(t *testing.T, statuses ...int) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+	old := retryWait
+	retryWait = time.Millisecond
+	t.Cleanup(func() { retryWait = old })
+
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := int(hits.Add(1))
+		if n <= len(statuses) {
+			http.Error(w, "nope", statuses[n-1])
+			return
+		}
+		w.Write([]byte("audio"))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &hits
+}
+
+func TestCallRetriesTransientFailures(t *testing.T) {
+	srv, hits := fakeAPI(t, http.StatusTooManyRequests, http.StatusServiceUnavailable)
+
+	got, err := call(context.Background(), "key", http.MethodPost, srv.URL, []byte("{}"))
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if string(got) != "audio" || hits.Load() != 3 {
+		t.Errorf("got %q after %d requests, want \"audio\" after 3", got, hits.Load())
+	}
+}
+
+// A 402 fails the same way every time, so retrying it would only waste time.
+func TestCallDoesNotRetryClientErrors(t *testing.T) {
+	srv, hits := fakeAPI(t, http.StatusPaymentRequired)
+
+	if _, err := call(context.Background(), "key", http.MethodPost, srv.URL, []byte("{}")); err == nil {
+		t.Fatal("want an error for 402")
+	}
+	if hits.Load() != 1 {
+		t.Errorf("%d requests, want 1", hits.Load())
+	}
+}
+
+func TestCallGivesUpAfterMaxAttempts(t *testing.T) {
+	statuses := make([]int, maxAttempts)
+	for i := range statuses {
+		statuses[i] = http.StatusBadGateway
+	}
+	srv, hits := fakeAPI(t, statuses...)
+
+	if _, err := call(context.Background(), "key", http.MethodPost, srv.URL, []byte("{}")); err == nil {
+		t.Fatal("want an error once every attempt has failed")
+	}
+	if hits.Load() != maxAttempts {
+		t.Errorf("%d requests, want %d", hits.Load(), maxAttempts)
 	}
 }

@@ -118,12 +118,20 @@ will be the only one.
 
 The free tier is 10,000 credits a month at roughly one credit per character. The
 test chunk is 1214 characters, so a single take costs about 12% of the monthly
-budget and there are only eight or so in a month. Eleven v3 is alpha and the
+budget and there are only eight or so in a month. Eleven v3 was alpha then, and the
 brief warns that several generations may be needed for a good take.
 
 So `cmd/dialogue` prints the exact request body and stops. `-send` is what
 spends credits, and the character count is printed before the call either way.
 Getting the payload wrong should cost nothing.
+
+Retries are bounded for the same reason. A 429 or 5xx is retried up to five
+attempts, with the backoff doubling from 5 seconds; every other error fails at
+once, because a 402 or a validation error would fail identically each time.
+ElevenLabs documents a 429 as either the plan's concurrency cap or
+platform-wide load, and says nothing about whether a failed or retried request
+is billed. That is unverified, so the per-key credit quota (README, Security)
+stays the real backstop against a retry loop draining the month.
 
 ## 7. On the free plan, only stock voices work through the API
 
@@ -209,6 +217,14 @@ script generator will be told to emit it, exactly as it is told to emit emotion
 tags. A code path that rewrote line text before synthesis would mean the JSON
 on disk was no longer what was sent, which is worth more than the keystrokes it
 would save.
+
+**Update, October 2026: the tag is now `[strong French accent]`.** The Eleven v4
+prompting guide documents accent tags in the form `[strong X accent]`, marked
+experimental and possibly less consistent across voices. With the move to v4
+(§11) the test chunk uses the documented form rather than the one that worked on
+v3. An external test script proposed stripping the tag in code instead; that was
+declined for the reason in the previous paragraph. Cost: seven more characters
+per line, 1518 to 1560.
 
 Two costs to name. Tags are part of `inputs[].text`, so they are billed: the
 accent tags added 96 characters to the test chunk, 1214 to 1310, about 8% per
@@ -315,7 +331,7 @@ loud: "Héhé" is a French chuckle, "heh heh" is not.
 
 Cost: 14 characters, 1504 to 1518.
 
-## 11. Which versions are current (checked September 2026)
+## 11. Which versions are current (rechecked October 2026)
 
 Three version numbers appear in this pipeline and they are independent of each
 other, which invites the suspicion that one of them is stale. It is worth
@@ -325,10 +341,13 @@ writing down so the question does not have to be reopened:
 |---|---|---|
 | Voice listing | `GET /v2/voices` | Current. There is no `/v3/voices`; the legacy one is `/v1/voices`, which this code does not use. |
 | Synthesis | `POST /v1/text-to-dialogue` | Current. This endpoint has only ever been v1. |
-| Model | `eleven_v3` | Current. No v4 exists; it is still documented as the most advanced model. |
+| Model | `eleven_v4` | Current. Launched 28 September 2026; the Text to Dialogue docs support v4 and v3 and recommend v4. `eleven_v3` is still supported, described as the previous generation. |
 
 So `v2` in the voices URL is the newest version of that endpoint, not a leftover,
-and the `v3` in the model id is a model generation rather than an API version.
+and the `v4` in the model id is a model generation rather than an API version.
+
+The September check read "No v4 exists", which was true when written and was
+overtaken three weeks later. That is the argument for dating this section.
 
 One neighbouring model is worth knowing about and rejecting explicitly:
 `eleven_v3_conversational`, a realtime variant at roughly 280ms latency that
@@ -337,14 +356,14 @@ this pipeline writes files that nobody listens to as they are produced. It would
 be the right model for a live agent and is the wrong one here.
 
 `eleven_turbo_v2_5` and `eleven_turbo_v2` are documented as outclassed by their
-Flash equivalents; neither is relevant, since only `eleven_v3` supports
-multi-speaker dialogue with audio tags.
+Flash equivalents; neither is relevant, since only `eleven_v4` and `eleven_v3`
+support Text to Dialogue.
 
 One more pair of numbers worth separating, because meeting the larger one first
-would suggest the code's limit is wrong: `eleven_v3` is documented with a
-5,000-character limit as a *model*, while Text to Dialogue caps a *request* at
-2,000 characters across all of `inputs[].text`. The lower one binds here, and
-`MaxChars` is set from it.
+would suggest the code's limit is wrong: `eleven_v4` is documented with a
+10,000-character limit as a *model* (`eleven_v3`: 5,000), while Text to
+Dialogue still caps a *request* at 2,000 characters across all of
+`inputs[].text`. The lower one binds here, and `MaxChars` is set from it.
 
 ## 12. What listening has established so far
 
@@ -366,6 +385,10 @@ lesson: Adam (Dominant, Firm) and Bella were replaced for fit, Jessica for
 Laura, and Bill — the only voice labelled `old`, and the best match on paper for
 a wise narrator — was dropped for being the flattest of the lot.
 
+All three takes were on `eleven_v3` with `[French accent]`. Since the move to
+`eleven_v4` (§11) and `[strong French accent]` (§8), none of these answers is
+guaranteed to carry over; the first v4 take should re-answer the table.
+
 ## 13. What was deliberately not built
 
 - **`voicebank.json`** (brief §6.1 and §7). With one story, the cast inside the story
@@ -377,14 +400,6 @@ a wise narrator — was dropped for being the flattest of the lot.
   can only be made by listening: which stability, and whether the chosen voices
   handle French well.
 - **The streaming endpoint.** Nothing listens live; a file is the deliverable.
-- **An explicit `output_format`.** The endpoint takes it as a query parameter
-  and defaults to `mp3_44100_128`, so the code relies on that default while
-  naming its output `chunk_N.mp3`. The two agree today and nothing verifies that
-  they still would: a changed default would produce correct audio under a
-  misleading extension. Setting it explicitly is one query parameter, and is the
-  right fix the moment anything but a person's ear consumes these files.
-- **`seed`.** Useful for A/B-ing a wording change on one chunk. There is nothing
-  to compare yet, and the field is one pointer away when there is.
 - **A good-take cache** (brief §6.4). Correct idea, premature: it needs more than one
   chunk and more than one take to have anything to cache.
 

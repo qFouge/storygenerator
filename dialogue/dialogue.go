@@ -10,16 +10,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/qdefou/storygenerator/story"
 )
 
-// Endpoint is the batch (non-streaming) Text-to-Dialogue call.
-const Endpoint = "https://api.elevenlabs.io/v1/text-to-dialogue"
+// Endpoint is the batch (non-streaming) Text-to-Dialogue call. output_format
+// is pinned rather than left to the API default, so the .mp3 extension the CLI
+// writes cannot silently disagree with what comes back.
+const Endpoint = "https://api.elevenlabs.io/v1/text-to-dialogue?output_format=mp3_44100_128"
 
-// ModelID is the only model that supports Text-to-Dialogue and audio tags.
-const ModelID = "eleven_v3"
+// ModelID is the model ElevenLabs recommends for Text-to-Dialogue. eleven_v3
+// also supports it — see docs/text-to-dialogue.md §11.
+const ModelID = "eleven_v4"
+
+// maxAttempts bounds the retries on 429 and 5xx, so a bad day at ElevenLabs
+// cannot turn into an endless loop.
+const maxAttempts = 5
+
+// retryWait is the first backoff delay; it doubles on every retry. It is a
+// variable rather than a constant only so the test does not sleep for real.
+var retryWait = 5 * time.Second
+
+// client bounds each attempt. http.DefaultClient has no timeout at all, so a
+// stalled connection would hang the CLI forever.
+var client = &http.Client{Timeout: 5 * time.Minute}
 
 // MaxChars is the documented ceiling on the summed length of inputs[].text for
 // a single request. The script generator aims well below it; this is the
@@ -98,29 +115,66 @@ func Synthesize(ctx context.Context, apiKey string, r Request) ([]byte, error) {
 }
 
 // call performs an authenticated request and returns the raw response body.
-// Both endpoints this package touches need the same key header and the same
-// treatment of error bodies, so neither duplicates it.
+// Both endpoints this package touches need the same key header, the same
+// treatment of error bodies and the same retries, so neither duplicates them.
+//
+// Only 429 and 5xx are retried. ElevenLabs documents a 429 as either the
+// plan's concurrency cap or platform-wide load, both of which clear on their
+// own. A 4xx such as 402 paid_plan_required or a validation error would fail
+// identically every time, so it is returned at once.
 func call(ctx context.Context, apiKey, method, url string, body []byte) ([]byte, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("no API key: set ELEVENLABS_API_KEY")
 	}
 
+	wait := retryWait
+	for attempt := 1; ; attempt++ {
+		status, data, err := once(ctx, apiKey, method, url, body)
+		if err != nil {
+			return nil, err
+		}
+		if status == http.StatusOK {
+			return data, nil
+		}
+
+		err = fmt.Errorf("elevenlabs %d %s: %s", status, http.StatusText(status), data)
+		retryable := status == http.StatusTooManyRequests || status >= 500
+		if !retryable || attempt == maxAttempts {
+			return nil, err
+		}
+		log.Printf("%v — retry %d/%d in %s", err, attempt, maxAttempts-1, wait)
+
+		// select waits on whichever happens first: the backoff elapsing, or
+		// the caller cancelling the context. A bare time.Sleep would ignore
+		// a cancellation for up to the full delay.
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
+		wait *= 2
+	}
+}
+
+// once performs a single attempt. A non-200 response is not an error here: it
+// comes back as a status and body, so call can decide whether to retry.
+func once(ctx context.Context, apiKey, method, url string, body []byte) (int, []byte, error) {
 	var r io.Reader
 	if body != nil {
 		r = bytes.NewReader(body)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, url, r)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	req.Header.Set("xi-api-key", apiKey)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	defer resp.Body.Close()
 
@@ -130,7 +184,8 @@ func call(ctx context.Context, apiKey, method, url string, body []byte) ([]byte,
 		// keys cannot use Voice Library voices. Capped so a huge body cannot
 		// flood the terminal.
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return nil, fmt.Errorf("elevenlabs %s: %s", resp.Status, msg)
+		return resp.StatusCode, msg, nil
 	}
-	return io.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
+	return resp.StatusCode, data, err
 }

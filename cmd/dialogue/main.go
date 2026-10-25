@@ -27,6 +27,7 @@ func run() error {
 	path := flag.String("story", "testdata/chunk-fr.json", "story JSON file")
 	index := flag.Int("chunk", 0, "chunk_index to synthesize")
 	stability := flag.Float64("stability", dialogue.DefaultStability, "request-level stability: 0 creative, 0.5 natural, 1 robust")
+	seed := flag.Int("seed", -1, "seed (0 to 4294967295) for best-effort repeatable takes when A/B-ing a wording; -1 omits it")
 	send := flag.Bool("send", false, "actually call ElevenLabs and spend credits")
 	listVoices := flag.Bool("list-voices", false, "list the stock voices a free account can use, then exit")
 	voiceLang := flag.String("voice-language", "", "with -list-voices, keep only voices labelled with this language (ISO 639-1, e.g. fr)")
@@ -50,6 +51,9 @@ func run() error {
 	req, err := dialogue.Payload(s, chunk, *stability)
 	if err != nil {
 		return err
+	}
+	if *seed >= 0 {
+		req.Seed = seed
 	}
 
 	fmt.Printf("%s — chunk %d: %d lines, %d characters, %d voices\n",
