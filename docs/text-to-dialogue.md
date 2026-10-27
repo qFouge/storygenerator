@@ -386,8 +386,20 @@ Laura, and Bill — the only voice labelled `old`, and the best match on paper f
 a wise narrator — was dropped for being the flattest of the lot.
 
 All three takes were on `eleven_v3` with `[French accent]`. Since the move to
-`eleven_v4` (§11) and `[strong French accent]` (§8), none of these answers is
-guaranteed to carry over; the first v4 take should re-answer the table.
+`eleven_v4` (§11) and `[strong French accent]` (§8), none of these answers was
+guaranteed to carry over, so the first v4 take (25 October 2026, same cast, same
+chunk at 1560 characters, stability 0.5) re-answered them:
+
+| Question | Answer on `eleven_v4` |
+|---|---|
+| Is `[strong French accent]` acted on? | Yes. |
+| Do emotion tags land? | Yes. |
+| Does the written laugh "Héhé... héhé !" sound like a laugh? | No — it still sounds spoken, as two syllables. |
+| Do the narrator and Aristide stay distinct? | Yes. |
+
+The one miss is the laugh, on both models. §10's fix of writing the sound into the
+text made it impossible to skip, but it did not make it a laugh. That question
+is still open (§14).
 
 ## 13. What was deliberately not built
 
@@ -409,9 +421,9 @@ guaranteed to carry over; the first v4 take should re-answer the table.
 - **Which stability.** Answered, and the answer is that it is the wrong knob for
   this problem: `0` sounded sad, `1` no better, so the default `0.5` stands and
   expressiveness is written into the text instead (§9).
-- **Whether the written laugh lands where the bare tag did not.** "Héhé..."
-  cannot be skipped the way `[chuckles]` was, but whether it sounds like a laugh
-  or like two spoken syllables is the open question.
+- **How to get an audible laugh.** Partly answered: on `eleven_v4`, "Héhé...
+  héhé !" is spoken as two syllables rather than laughed (§12). It can no longer
+  be skipped the way `[chuckles]` was, but it is not a laugh yet either.
 - **Whether lower stability would have rescued the tags instead.** `Robust` is
   documented as "less responsive to directional prompts", which implies
   `Creative` is more responsive. `0` was rejected earlier for sounding sad, but
@@ -420,14 +432,14 @@ guaranteed to carry over; the first v4 take should re-answer the table.
 - **Whether a `young` voice passes for a child.** The stock set has no child
   voice; Laura is the closest. Judge by ear before deciding to rewrite Lucie
   older or to pay.
-- **Whether the narrator and Aristide stay distinct.** Both are male and both
-  `middle_aged`. The stock set offers no third male register, so if they blend
-  the fix is not another swap.
+- **Whether the narrator and Aristide stay distinct.** Answered: yes, on
+  `eleven_v4` (§12), despite both being male and `middle_aged`.
 - **How far the tag-heavy approach can be pushed.** Answered in part by
   listening: English tags inside French text are acted on, not read aloud, and
   three to five per line are tolerated. Colouring tags work; sound-producing
   ones did not (§10). Where the ceiling actually sits is untested.
 - **The real credit rate.** The brief says the API is discounted relative to the
-  website's one-credit-per-character, but the rate is unpublished. The first
-  `-send` against a known 1214-character chunk measures it against the dashboard
-  balance.
+  website's one-credit-per-character, but the rate is unpublished. The 25
+  October v4 take sent exactly 1560 characters, so its charge on the dashboard
+  measures the rate. The API key cannot report it: it lacks `user_read` and
+  `speech_history_read`, by design (README, Security).
